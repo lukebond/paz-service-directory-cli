@@ -1,0 +1,114 @@
+#!/usr/bin/env node
+
+var cli = require('cli'),
+    fs = require('fs'),
+    restify = require('restify'),
+    AsciiTable = require('ascii-table');
+
+cli.parse(
+  {
+    host: ['h', 'alexandria hostname', 'host', 'localhost'],
+    port: ['p', 'alexandria port', 'number', 9000],
+    json: ['json', 'Produce JSON output', 'boolean', false],
+    file: ['f', 'Outputs unitfile to a file instead of stdout (uses <service name>.service)', 'boolean', false]
+  },
+  ['list', 'show', 'unitfile', 'delete']);
+
+var client = restify.createJsonClient({
+  url: 'http://' + cli.options.host + ':' + cli.options.port
+});
+
+function checkCommandArgs() {
+  if (cli.args.length == 0) {
+    cli.error('You must specify a service name.');
+    process.exit(1);
+  }
+}
+
+function printServicesTable(rows) {
+  var table = new AsciiTable();
+  table.setHeadingAlignLeft().removeBorder();
+  table.setHeading('NAME', 'DOCKER IMAGE', 'AUTO DEPLOY', '# INSTANCES');
+  rows.forEach(function (service) {
+    table.addRow(service.name, service.dockerImage, service.autoDeploy, service.numInstances);
+  });
+  console.log(table.toString());
+}
+
+switch (cli.command) {
+  case 'list':
+    if (cli.args.length > 0) {
+      cli.info('Ingoring additional arguments ' + cli.args);
+    }
+    client.get('/services', function (err, req, res, obj) {
+      if (err) {
+        cli.error(err.message);
+        process.exit(1);
+      }
+      if (cli.options.json) {
+        console.log(obj);
+      }
+      else {
+        printServicesTable(obj.services);
+      }
+      client.close();
+    });
+    break;
+  case 'show':
+    checkCommandArgs();
+    client.get('/services/' + cli.args[0], function (err, req, res, obj) {
+      if (err) {
+        cli.error(err.message);
+        process.exit(1);
+      }
+      if (cli.options.json) {
+        console.log(obj);
+      }
+      else {
+        printServicesTable([obj]);
+      }
+      client.close();
+    });
+    break;
+  case 'unitfile':
+    checkCommandArgs();
+    client.get('/services/' + cli.args[0] + '/unitfile', function (err, req, res, obj) {
+      if (err) {
+        cli.error(err.message);
+        process.exit(1);
+      }
+      if (cli.options.json) {
+        console.log(obj.unitFiles);
+      }
+      else {
+        var index = 1;
+        obj.unitFiles.forEach(function (uf) {
+          if (cli.options.file) {
+            fs.writeFileSync(cli.args[0] + '-' + index + '.service', uf);
+          }
+          else {
+            console.log(uf);
+          }
+          ++index;
+        });
+      }
+      client.close();
+    });
+    break;
+  case 'delete':
+    checkCommandArgs();
+    client.del('/services/' + cli.args[0], function (err, req, res, obj) {
+      if (err) {
+        cli.error(err.message);
+        process.exit(1);
+      }
+      cli.info('Service "' + cli.args[0] + '" deleted.');
+      client.close();
+    });
+    break;
+}
+
+// client.get('/alerts?state=new', function (err, req, res, obj) {
+// });
+
+// list show unitfile delete
