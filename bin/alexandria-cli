@@ -98,12 +98,13 @@ function printServicesTable(rows) {
   var table = new AsciiTable();
   table.setHeadingAlignLeft().removeBorder();
   table.setHeading(
-    'NAME', 'DOCKER IMAGE', '# INSTANCES', 'MODIFIED');
+    'NAME', 'DOCKER IMAGE', 'CREATED', 'MODIFIED');
   var now = Date.now();
   rows.forEach(function (service) {
     table.addRow(
-      service.name, service.dockerImage, service.numInstances,
-      getModified(service.lastModifiedTime, now));
+      service.name, service.dockerImage,
+      service.createdTime ? getModified(service.createdTime, now) : '',
+      service.lastModifiedTime ? getModified(service.lastModifiedTime, now) : '');
   });
   console.log(table.toString());
 }
