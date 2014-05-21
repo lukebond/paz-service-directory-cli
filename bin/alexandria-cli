@@ -5,24 +5,93 @@ var cli = require('cli'),
     restify = require('restify'),
     AsciiTable = require('ascii-table');
 
+var settableFields = {
+  name: 'string',
+  dockerImage: 'string',
+  gitReceiveHook: 'string',
+  autoDeploy: 'string',
+  numInstances: 'number'
+};
+
 cli.parse(
   {
-    host: ['h', 'alexandria hostname', 'host', 'localhost'],
-    port: ['p', 'alexandria port', 'number', 9000],
+    host: ['h', 'alexandria server hostname', 'host', 'localhost'],
+    port: ['p', 'alexandria server port', 'number', 9000],
     json: ['json', 'Produce JSON output', 'boolean', false],
-    file: ['f', 'Outputs unitfile to a file instead of stdout (uses <service name>.service)', 'boolean', false]
+    file: [
+      'f',
+      'Outputs unitfile to a file instead of stdout (uses <service name>.service)',
+      'boolean',
+      false
+    ],
+    set:  [
+      's',
+      'Sets field values. Only applies to \'modify\' command, for which it is '
+        + 'required. Either pass @filename or send comma-delimited key-value pairs '
+        + '(e.g. --set key=value,key=value...). '
+        + 'Only the following fields are settable via the latter method: '
+        + Object.keys(settableFields).join(', ') + '.',
+      'string'
+    ]
   },
-  ['list', 'show', 'unitfile', 'delete']);
+  ['list', 'show', 'modify', 'unitfile', 'delete']);
 
 var client = restify.createJsonClient({
   url: 'http://' + cli.options.host + ':' + cli.options.port
 });
 
-function checkCommandArgs() {
+function ensureServiceNamePassed() {
   if (cli.args.length == 0) {
     cli.error('You must specify a service name.');
     process.exit(1);
   }
+}
+
+function getSetParamChanges() {
+  if (!cli.options.set) {
+    cli.error('You must specify a --set parameter.');
+    process.exit(1);
+  }
+  if (cli.options.set.indexOf('@') == 0) {
+    var filename = cli.options.set.substring(1);
+    // XXX some sort of error handling here!
+    var contents = fs.readFileSync(filename).toString();
+    return JSON.parse(contents);
+  }
+  if (!cli.options.set.match(/^[^=]+=[^=]+/)) {
+    cli.error('Bad format of --set parameter.');
+    process.exit(1);
+  }
+  var changes = {};
+  cli.options.set.split(',').forEach(function (kvString) {
+    var kvSplit = kvString.split('=');
+    if (!settableFields[kvSplit[0]]) {
+      cli.error('Field \'' + kvSplit[0] + '\' not settable. Use @ method.');
+      process.exit(1);
+    }
+    else {
+      changes[kvSplit[0]] = settableFields[kvSplit[0]] === 'number'
+        ? +(kvSplit[1])
+        : kvSplit[1];
+    }
+  });
+  return changes;
+}
+
+function showService(name) {
+  client.get('/services/' + name, function (err, req, res, obj) {
+    if (err) {
+      cli.error(err.message);
+      process.exit(1);
+    }
+    if (cli.options.json) {
+      console.log(obj);
+    }
+    else {
+      printServicesTable([obj]);
+    }
+    client.close();
+  });
 }
 
 function printServicesTable(rows) {
@@ -55,23 +124,29 @@ switch (cli.command) {
     });
     break;
   case 'show':
-    checkCommandArgs();
-    client.get('/services/' + cli.args[0], function (err, req, res, obj) {
+    ensureServiceNamePassed();
+    showService(cli.args[0]);
+    break;
+  case 'modify':
+    ensureServiceNamePassed();
+    var changes = getSetParamChanges();
+    client.patch('/services/' + cli.args[0], changes, function (err, req, res, obj) {
       if (err) {
         cli.error(err.message);
         process.exit(1);
       }
+      client.close();
       if (cli.options.json) {
         console.log(obj);
       }
       else {
-        printServicesTable([obj]);
+        showService(cli.args[0]);
       }
-      client.close();
     });
+
     break;
   case 'unitfile':
-    checkCommandArgs();
+    ensureServiceNamePassed();
     client.get('/services/' + cli.args[0] + '/unitfile', function (err, req, res, obj) {
       if (err) {
         cli.error(err.message);
@@ -96,7 +171,7 @@ switch (cli.command) {
     });
     break;
   case 'delete':
-    checkCommandArgs();
+    ensureServiceNamePassed();
     client.del('/services/' + cli.args[0], function (err, req, res, obj) {
       if (err) {
         cli.error(err.message);
