@@ -97,11 +97,37 @@ function showService(name) {
 function printServicesTable(rows) {
   var table = new AsciiTable();
   table.setHeadingAlignLeft().removeBorder();
-  table.setHeading('NAME', 'DOCKER IMAGE', 'AUTO DEPLOY', '# INSTANCES');
+  table.setHeading(
+    'NAME', 'DOCKER IMAGE', '# INSTANCES', 'MODIFIED');
+  var now = Date.now();
   rows.forEach(function (service) {
-    table.addRow(service.name, service.dockerImage, service.autoDeploy, service.numInstances);
+    table.addRow(
+      service.name, service.dockerImage, service.numInstances,
+      getModified(service.lastModifiedTime, now));
   });
   console.log(table.toString());
+}
+
+function getModified(when, now) {
+  var delta = (now - when);
+  if (delta < 120000) {
+    return 'Just now';
+  }
+  else if (delta < 3000000) {
+    return Math.floor(delta / 60000) + ' minutes ago';
+  }
+  else if (delta < 7200000) {
+    return 'About an hour ago';
+  }
+  else if (delta < 36000000) {
+    return Math.floor(delta / 3600000) + ' hours ago';
+  }
+  else if (delta < 172800000) {
+    return 'About a day ago';
+  }
+  else {
+    return Math.floor(delta / 86400000) + ' days ago';
+  }
 }
 
 switch (cli.command) {
