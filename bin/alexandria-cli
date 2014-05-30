@@ -17,7 +17,7 @@ cli.parse(
   {
     host: ['h', 'alexandria server hostname', 'host', 'localhost'],
     port: ['p', 'alexandria server port', 'number', 9000],
-    json: ['json', 'Produce JSON output', 'boolean', false],
+    json: ['j', 'Produce JSON output', 'boolean', false],
     file: [
       'f',
       'Outputs unitfile to a file instead of stdout (uses <service name>.service)',
@@ -32,7 +32,9 @@ cli.parse(
         + 'Only the following fields are settable via the latter method: '
         + Object.keys(settableFields).join(', ') + '.',
       'string'
-    ]
+    ],
+    quiet: ['s', 'Suppress table header in output.', 'boolean', false],
+    index: ['i', 'Index of the unit file to output (0-based).', 'number', -1]
   },
   ['list', 'show', 'modify', 'unitfile', 'delete']);
 
@@ -97,8 +99,10 @@ function showService(name) {
 function printServicesTable(rows) {
   var table = new AsciiTable();
   table.setHeadingAlignLeft().removeBorder();
-  table.setHeading(
-    'NAME', 'DOCKER IMAGE', 'CREATED', 'MODIFIED');
+  if (!cli.options.noheader) {
+    table.setHeading(
+      'NAME', 'DOCKER IMAGE', 'CREATED', 'MODIFIED');
+  }
   var now = Date.now();
   rows.forEach(function (service) {
     table.addRow(
@@ -128,6 +132,16 @@ function getModified(when, now) {
   }
   else {
     return Math.floor(delta / 86400000) + ' days ago';
+  }
+}
+
+function outputUnitFile(unitFiles, index) {
+  var uf = unitFiles[index];
+  if (cli.options.file) {
+    fs.writeFileSync(cli.args[0] + '-' + (index + 1) + '.service', uf);
+  }
+  else {
+    console.log(uf);
   }
 }
 
@@ -183,16 +197,14 @@ switch (cli.command) {
         console.log(obj.unitFiles);
       }
       else {
-        var index = 1;
-        obj.unitFiles.forEach(function (uf) {
-          if (cli.options.file) {
-            fs.writeFileSync(cli.args[0] + '-' + index + '.service', uf);
+        if (cli.options.index >= 0) {
+          outputUnitFile(obj.unitFiles, cli.options.index);
+        }
+        else {
+          for (var i = 0; i < obj.unitFiles.length; ++i) {
+            outputUnitFile(obj.unitFiles, i);
           }
-          else {
-            console.log(uf);
-          }
-          ++index;
-        });
+        }
       }
       client.close();
     });
