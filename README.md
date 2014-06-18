@@ -5,6 +5,7 @@ CLI for the paz service directory.
 
 ## Usage
 
+```
 Usage:
   paz-svcdir-cli [OPTIONS] <command> [ARGS]
 
@@ -26,3 +27,4 @@ Options:
 
 Commands:
   delete, list, modify, show, unitfile
+```
