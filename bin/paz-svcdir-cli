@@ -15,8 +15,8 @@ var settableFields = {
 
 cli.parse(
   {
-    host: ['h', 'alexandria server hostname', 'host', 'localhost'],
-    port: ['p', 'alexandria server port', 'number', 9000],
+    host: ['h', 'paz service-directory server hostname', 'host', 'localhost'],
+    port: ['p', 'paz service-directory server port', 'number', 9000],
     json: ['j', 'Produce JSON output', 'boolean', false],
     file: [
       'f',
