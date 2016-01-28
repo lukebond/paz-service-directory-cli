@@ -1,6 +1,8 @@
 paz-service-directory-cli
 =========================
 
+** this is really old, out of date and unused **
+
 CLI for the paz service directory.
 
 ## Usage
